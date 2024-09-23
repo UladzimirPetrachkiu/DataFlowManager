@@ -1,0 +1,67 @@
+# prefect.yaml
+
+# Prefect Agent Configuration
+agents:
+  default:
+    type: local
+    labels: [default]
+    concurrency: 5  # Limit on the number of simultaneously running tasks
+
+# Prefect Worker Configuration
+workers:
+  default:
+    type: process
+    labels: [default]
+    concurrency: 5  # Limit on the number of simultaneously running tasks
+    env:
+      PREFECT_LOGGING_LEVEL: INFO
+    resources:
+      memory: 512Mi  # Memory limit for workers
+      cpu: 1  # CPU limit for workers
+
+# Prefect UI Configuration
+ui:
+  apollo:
+    url: http://localhost:4200/graphql
+  server:
+    host: 0.0.0.0
+    port: 4200
+  database:
+    connection_url: sqlite:///prefect.db
+
+# Prefect Server Configuration
+server:
+  host: 0.0.0.0
+  port: 4200
+  database:
+    connection_url: sqlite:///prefect.db
+
+# Prefect Logging Configuration
+logging:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+deployments:
+- name: stock-data-flow
+  version:
+  tags: []
+  concurrency_limit:
+  description:
+  entrypoint: main.py:stock_data_flow
+  parameters:
+    csv_file: input_data/CSV_ONLY_IBM.csv
+  work_pool:
+    name: stock-data-pool
+    work_queue_name:
+    job_variables: {}
+  enforce_parameter_schema: true
+  schedules:
+  - cron: '* * * * *'
+    timezone: MSK
+    day_or: true
+    active: true
+    max_active_runs:
+    catchup: false
+  pull:
+  - prefect.deployments.steps.git_clone:
+      repository: git@github.com:UladzimirPetrachkiu/DataFlowManager.git
+      branch: main
