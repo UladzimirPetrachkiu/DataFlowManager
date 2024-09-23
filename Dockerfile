@@ -24,7 +24,8 @@ EXPOSE 4200
 
 # Command to run the application, create the work pool, deploy the flow, and start the worker
 CMD ["sh", "-c", "prefect server start & \
-                  prefect work-pool create 'stock-data-pool' --type process && \
-                  prefect deploy --pool 'stock-data-pool' --name 'stock-data-flow' 'main.py:stock_data_flow' && \
-                  prefect deployment run 'Stock Data Flow/stock-data-flow' && \
+                  prefect work-pool create 'data-pool' --type process && \
+                  prefect deploy --pool 'data-pool' --name 'data-flow' 'main.py:data_flow' && \
+                  prefect deployment run 'Data Flow/data-flow' && \
+                  prefect worker start --pool 'data-pool' && \
                   tail -f /dev/null"]

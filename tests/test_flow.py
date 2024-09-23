@@ -3,8 +3,8 @@
 import os
 import pandas as pd
 import unittest
-from src.config import API_KEY, API_URL
-from src.flow import StockDataProcessor
+from config import API_KEY, API_URL
+from stock_data_flow import StockDataProcessor
 
 def create_dummy_csv(file_path: str) -> None:
     """Creates a dummy CSV file with a single row containing the symbol 'IBM'."""

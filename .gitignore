@@ -47,6 +47,11 @@ wheels/
 *.swp
 
 # Additional folders
-input_data/*
-output_data/*
+output_data/json/*
+output_data/plot/*
 db/*
+
+# Except for README.txt
+!output_data/json/README.txt
+!output_data/plot/README.txt
+!db/README.txt

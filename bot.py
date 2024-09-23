@@ -1,10 +1,11 @@
-# src/bot.py
+# bot.py
 
+import os
 from typing import Set
 import sqlite3
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, ContextTypes
-from src.config import TELEGRAM_BOT_TOKEN
+from config import TELEGRAM_BOT_TOKEN
 
 class TelegramBot:
     """A simple Telegram bot that manages subscriptions for notifications."""
@@ -17,7 +18,7 @@ class TelegramBot:
             token (str): The token provided by Telegram to access the bot's API.
         """
         self.bot = Bot(token=token)
-        self.db_file = 'db/subscribers.db'
+        self.db_file = os.path.join(os.path.dirname(__file__), 'db', 'subscribers.db')
         self.create_table()
 
     def create_table(self) -> None:
@@ -27,6 +28,9 @@ class TelegramBot:
         Creates a SQLite database table named 'subscribers' with a single column
         'user_id' as the primary key.
         """
+        db_directory = os.path.dirname(self.db_file)
+        os.makedirs(db_directory, exist_ok=True)
+        
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
             cursor.execute('''

@@ -1,0 +1,14 @@
+{
+    "task": "Fetch Stock Data",
+    "symbol": "unknown",
+    "start_time": "2024-09-23T20:28:28.541193",
+    "performance": [
+        {
+            "cpu": 70.6,
+            "memory": 71.9,
+            "timestamp": "2024-09-23T20:28:29.558968"
+        }
+    ],
+    "end_time": "2024-09-23T20:28:30.560155",
+    "execution_time": 2.0199642181396484
+}

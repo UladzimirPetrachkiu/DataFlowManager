@@ -1,27 +1,28 @@
-# src/flow.py
+# data_flow.py
 
-import asyncio
-import requests
-import pandas as pd
-import matplotlib
-
+from datetime import datetime, timedelta
+from functools import wraps
 from typing import Dict, Any
 from pathlib import Path
 
+import asyncio
+import json
+import threading
 import time
-import psutil
 import os
 
 import concurrent.futures
-
-from datetime import timedelta
+import matplotlib
+import psutil
+import requests
+import pandas as pd
 
 from prefect import flow, task, get_run_logger
 from prefect.tasks import task_input_hash
 from prefect.artifacts import create_markdown_artifact
 
-from src.bot import telegram_bot
-from src.config import (
+from bot import telegram_bot
+from config import (
     API_KEY, API_URL, RATE_LIMIT_INTERVAL, USE_SEMAPHORE, WORKER_SEMAPHORE,
     INITIAL_WORKERS, MAX_WORKERS, RETRIES, RETRY_DELAY_SECONDS,
     CPU_LOAD_THRESHOLD, MEMORY_USAGE_THRESHOLD
@@ -29,6 +30,67 @@ from src.config import (
 
 # Set Matplotlib backend to avoid GUI warning
 matplotlib.use('Agg')
+
+def performance_report_decorator(task_name):
+    """
+    A decorator to monitor performance (CPU, memory, execution time) during task execution.
+    
+    Args:
+        task_name (str): The name of the task being executed.
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            symbol = kwargs.get('symbol', 'unknown')
+            start_time = time.time()
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_data = {
+                "task": task_name,
+                "symbol": symbol,
+                "start_time": datetime.now().isoformat(),
+                "performance": []
+            }
+            report_file = Path(f"reports/{task_name}_{symbol}_{timestamp}.json")
+            report_file.parent.mkdir(parents=True, exist_ok=True)
+
+            stop_monitoring = threading.Event()
+
+            # Function to log performance data in a separate thread
+            def log_performance():
+                while not stop_monitoring.is_set():
+                    cpu_usage = psutil.cpu_percent(interval=1)
+                    memory_usage = psutil.virtual_memory().percent
+                    report_data["performance"].append({
+                        "cpu": cpu_usage,
+                        "memory": memory_usage,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    time.sleep(1)
+
+            # Start the performance logging in a separate thread
+            performance_thread = threading.Thread(target=log_performance)
+            performance_thread.start()
+
+            try:
+                result = func(*args, **kwargs)  # Execute the main task
+            except Exception as e:
+                report_data["error"] = str(e)
+                raise e
+            finally:
+                # Stop the performance monitoring thread and wait for it to finish
+                stop_monitoring.set()
+                performance_thread.join()
+
+                # Finalize the report
+                end_time = time.time()
+                report_data["end_time"] = datetime.now().isoformat()
+                report_data["execution_time"] = end_time - start_time
+                report_file.write_text(json.dumps(report_data, indent=4))
+
+            return result
+
+        return wrapper
+    return decorator
 
 class StockDataProcessor:
     """Class for processing stock data: reading CSV, fetching data from API, processing
@@ -73,6 +135,7 @@ class StockDataProcessor:
             logger.error(f"Error loading CSV: {e}")
             raise
 
+    @performance_report_decorator(task_name="Fetch Stock Data")
     @task(
         retries=RETRIES,
         retry_delay_seconds=RETRY_DELAY_SECONDS,
@@ -125,6 +188,7 @@ class StockDataProcessor:
             logger.error(f"Exception occurred when fetching data for {symbol}: {e}")
             raise
 
+    @performance_report_decorator(task_name="Process Stock Data")
     @task(
         retries=RETRIES,
         retry_delay_seconds=RETRY_DELAY_SECONDS,
@@ -208,7 +272,7 @@ class StockDataProcessor:
         except Exception as e:
             logger.error(f"Error sending Telegram notification: {e}")
 
-    @task
+    @task(name="Process symbol")
     def process_symbol(self, symbol: str) -> str:
         """
         Processes a single stock symbol.
@@ -269,6 +333,7 @@ class StockDataProcessor:
 
         return executor
 
+@flow(name="stock_data_flow")
 def stock_data_flow(csv_file_path: str) -> None:
     """
     Main Prefect flow orchestrating CSV reading, API requests, data processing, and result saving.
